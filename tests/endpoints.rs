@@ -3,6 +3,7 @@ use serde_json::json;
 
 use surreal_simple::telemetry::{get_subscriber, init_subscriber};
 
+// region: -- conditional tracing for tests
 static TRACING: Lazy<()> = Lazy::new(|| {
     let default_filter_level = "info".to_string();
     let subscriber_name = "test".to_string();

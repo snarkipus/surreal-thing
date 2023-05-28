@@ -4,9 +4,10 @@ use telemetry::{get_subscriber, init_subscriber};
 use tower_http::trace::TraceLayer;
 use tracing::info;
 
-mod error;
-mod person;
-mod telemetry;
+pub mod error;
+pub mod person;
+pub mod telemetry;
+pub mod db;
 
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
@@ -14,9 +15,8 @@ use axum::routing::{delete, get, post, put};
 use axum::{Router, Server};
 use uuid::Uuid;
 use std::net::SocketAddr;
-use surrealdb::engine::remote::ws::Ws;
-use surrealdb::opt::auth::Root;
-use surrealdb::Surreal;
+
+use crate::db::{DatabaseSettings, Database};
 
 static TRACING: Lazy<()> = Lazy::new(|| {
     let default_filter_level = "info".to_string();
@@ -35,15 +35,8 @@ static TRACING: Lazy<()> = Lazy::new(|| {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Lazy::force(&TRACING);
 
-    let db = Surreal::new::<Ws>("localhost:8000").await?;
-
-    db.signin(Root {
-        username: "surreal",
-        password: "password",
-    })
-    .await?;
-
-    db.use_ns("namespace").use_db("database").await?;
+    let db_settings = DatabaseSettings::default();
+    let db = Database::new(&db_settings).await?;
 
     let app = Router::new()
         .route("/person/:id", post(person::create))
@@ -63,7 +56,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 )
             }),
         )
-        .with_state(db);
+        .with_state(db.get_connection());
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
 
