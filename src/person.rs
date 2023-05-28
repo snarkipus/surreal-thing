@@ -11,11 +11,15 @@ const PERSON: &str = "person";
 
 type Db = State<Surreal<Client>>;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Person {
     name: String,
 }
 
+#[tracing::instrument(
+    name = "Create",
+    skip(db, id, person),
+)]
 pub async fn create(
     db: Db,
     id: Path<String>,
@@ -25,11 +29,19 @@ pub async fn create(
     Ok(Json(person))
 }
 
+#[tracing::instrument(
+    name = "Read",
+    skip(db, id),
+)]
 pub async fn read(db: Db, id: Path<String>) -> Result<Json<Option<Person>>, Error> {
     let person = db.select((PERSON, &*id)).await?;
     Ok(Json(person))
 }
 
+#[tracing::instrument(
+    name = "Update",
+    skip(db, id, person),
+)]
 pub async fn update(
     db: Db,
     id: Path<String>,
@@ -39,11 +51,19 @@ pub async fn update(
     Ok(Json(person))
 }
 
+#[tracing::instrument(
+    name = "Delete",
+    skip(db, id),
+)]
 pub async fn delete(db: Db, id: Path<String>) -> Result<Json<Option<Person>>, Error> {
     let person = db.delete((PERSON, &*id)).await?;
     Ok(Json(person))
 }
 
+#[tracing::instrument(
+    name = "List",
+    skip(db),
+)]
 pub async fn list(db: Db) -> Result<Json<Vec<Person>>, Error> {
     let people = db.select(PERSON).await?;
     Ok(Json(people))
