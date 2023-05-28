@@ -92,13 +92,13 @@ async fn create_transaction() {
     let mut app = setup().await;
 
     let sql_0 = "CREATE person:uuid() CONTENT { name: 'foo' }";
-    app.manager.add_query(sql_0);
+    app.manager.add_query(sql_0).unwrap();
 
     let sql_1 = "CREATE person:uuid() CONTENT { name: 'bar' }";
-    app.manager.add_query(sql_1);
+    app.manager.add_query(sql_1).unwrap();
 
     let sql_2 = "CREATE person:uuid() CONTENT { name: 'baz' }";
-    app.manager.add_query(sql_2);
+    app.manager.add_query(sql_2).unwrap();
 
     let transaction = app.manager.generate_transaction();
     let _res = app.db.query(transaction).await.unwrap();
