@@ -111,6 +111,7 @@ mod tests {
 
     #[tokio::test]
     async fn create_license() {
+        // region: working code
         let db = create_db().await;
 
         // create license number
@@ -176,11 +177,12 @@ mod tests {
             .bind(("license_number", &license_number))
             .await
             .unwrap();
+        // endregion: working code
 
         // Select id from person given a license number
         let sql = "
             LET $blah = SELECT id FROM registry WHERE registration = $license_number;
-            SELECT id, $blah->licenses->person from person;
+            SELECT *, $blah->licenses->person from person;
         ";
 
         let mut res = db
@@ -188,9 +190,15 @@ mod tests {
             .bind(("license_number", license_number))
             .await
             .unwrap();
-        dbg!(&res);
-        let _ = res.take::<Option<Thing>>(0).unwrap();
-        let person_id = res.take::<Vec<Thing>>(1).unwrap();
+
+        let person_id: Thing = res
+            .take::<Vec<PersonModel>>(1)
+            .map(|mut v: Vec<PersonModel>| v.pop())
+            .map(|p: Option<PersonModel>| p.unwrap())
+            .map(|p: PersonModel| p.id)
+            .map(|t: Option<Thing>| t.unwrap())
+            .unwrap();
+
         dbg!(person_id);
     }
 }
