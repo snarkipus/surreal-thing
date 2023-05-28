@@ -130,6 +130,7 @@ impl QueryManager {
     #[tracing::instrument(name = "Executing QueryManager", skip(self, db))]
     pub async fn execute(&mut self, db: &Surreal<Client>) -> Result<()> {
         let transaction = self.generate_transaction();
+        tracing::debug!(transaction = %transaction.0);
         match db.query(transaction).await {
             Ok(_) => {
                 self.queries.clear();
