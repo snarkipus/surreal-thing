@@ -1,0 +1,21 @@
+#V2
+INFO FOR KV;
+USE NS default;
+INFO FOR NS;
+REMOVE NS default;
+INFO FOR NS;
+INFO FOR KV;
+DEFINE NS default;
+INFO FOR KV;
+use NS default;
+INFO FOR NS;
+USE DB `d97eafd0-de02-4416-837e-b372e86f2ab6`;
+INFO FOR DB;
+select * FROM subscriptions;
+select * FROM subscription_tokens;
+INFO FOR TABLE subscriptions;
+INFO FOR TABLE subscription_tokens;
+INFO FOR KV;
+USE NS default;
+INFO FOR NS;
+REMOVE NS default;
