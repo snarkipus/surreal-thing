@@ -1,23 +1,28 @@
 use axum::body::Body;
+use axum_macros::FromRef;
 use once_cell::sync::Lazy;
 use telemetry::{get_subscriber, init_subscriber};
+use tokio::sync::Mutex;
 use tower_http::trace::TraceLayer;
 use tracing::info;
 
 pub mod error;
-pub mod person;
+pub mod api;
 pub mod telemetry;
 pub mod db;
 
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::routing::{delete, get, post, put};
+use axum::routing::get;
 use axum::{Router, Server};
 use uuid::Uuid;
 use std::net::SocketAddr;
+use std::sync::Arc;
 
-use crate::db::{DatabaseSettings, Database};
+use crate::db::{DatabaseSettings, Database, QueryManager};
 
+
+// region: -- conditional tracing for tests
 static TRACING: Lazy<()> = Lazy::new(|| {
     let default_filter_level = "info".to_string();
     let subscriber_name = "test".to_string();
@@ -31,6 +36,12 @@ static TRACING: Lazy<()> = Lazy::new(|| {
 });
 // endregion: -- conditional tracing for tests
 
+#[derive(Debug, Clone, FromRef)]
+pub struct AppState {
+    pub db: Database,
+    pub manager: Arc<Mutex<QueryManager>>,
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Lazy::force(&TRACING);
@@ -39,11 +50,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let db = Database::new(&db_settings).await?;
 
     let app = Router::new()
-        .route("/person/:id", post(person::create))
-        .route("/person/:id", get(person::read))
-        .route("/person/:id", put(person::update))
-        .route("/person/:id", delete(person::delete))
-        .route("/people", get(person::list))
+        .merge(api::person_routes())
         .route("/health_check", get(health_check))
         .layer(
             TraceLayer::new_for_http().make_span_with(|request: &hyper::Request<Body>| {

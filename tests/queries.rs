@@ -1,3 +1,4 @@
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use surrealdb::{
     engine::remote::ws::Client,
@@ -5,7 +6,23 @@ use surrealdb::{
     Surreal,
 };
 
-use surreal_simple::db::{Database, DatabaseSettings, QueryManager};
+use surreal_simple::{
+    db::{Database, DatabaseSettings, QueryManager},
+    telemetry::{get_subscriber, init_subscriber},
+};
+// region: -- conditional tracing for tests
+static TRACING: Lazy<()> = Lazy::new(|| {
+    let default_filter_level = "info".to_string();
+    let subscriber_name = "test".to_string();
+    if std::env::var("TEST_LOG").is_ok() {
+        let subscriber = get_subscriber(subscriber_name, default_filter_level, std::io::stdout);
+        init_subscriber(subscriber);
+    } else {
+        let subscriber = get_subscriber(subscriber_name, default_filter_level, std::io::sink);
+        init_subscriber(subscriber);
+    }
+});
+// endregion: -- conditional tracing for tests
 
 pub struct TestApp {
     pub db: Surreal<Client>,
@@ -13,9 +30,10 @@ pub struct TestApp {
 }
 
 async fn setup() -> TestApp {
+    Lazy::force(&TRACING);
+
     let db = Database::new(&DatabaseSettings::default()).await.unwrap();
-    
-    
+
     TestApp {
         db: db.get_connection(),
         manager: QueryManager::new(),
@@ -32,7 +50,7 @@ struct PersonModel {
 #[tokio::test]
 async fn create_person() {
     let app = setup().await;
-    
+
     // Simple stuff - SurrealDB handles creating the uuid() in the database
     let sql = "CREATE person:uuid() CONTENT { name: $name }";
 
@@ -65,7 +83,8 @@ async fn create_people() {
             COMMIT TRANSACTION;
         ";
 
-    let mut res = app.db
+    let mut res = app
+        .db
         .query(sql)
         .bind(("name1", "foo"))
         .bind(("name2", "bar"))
@@ -91,28 +110,44 @@ async fn create_people() {
 async fn create_transaction() {
     let mut app = setup().await;
 
-    let sql_0 = "CREATE person:uuid() CONTENT { name: 'foo' }";
-    app.manager.add_query(sql_0).unwrap();
+    let sql_0 = format!(
+        "CREATE {} CONTENT {{ name: 'foo' }}",
+        Thing::from(("person".into(), uuid::Uuid::new_v4().to_string()))
+    );
+    app.manager.add_query(&sql_0).unwrap();
 
-    let sql_1 = "CREATE person:uuid() CONTENT { name: 'bar' }";
-    app.manager.add_query(sql_1).unwrap();
+    let sql_1 = format!(
+        "CREATE {} CONTENT {{ name: 'bar' }}",
+        Thing::from(("person".into(), uuid::Uuid::new_v4().to_string()))
+    );
+    app.manager.add_query(&sql_1).unwrap();
 
-    let sql_2 = "CREATE person:uuid() CONTENT { name: 'baz' }";
-    app.manager.add_query(sql_2).unwrap();
+    let sql_2 = format!(
+        "CREATE {} CONTENT {{ name: 'baz' }}",
+        Thing::from(("person".into(), uuid::Uuid::new_v4().to_string()))
+    );
+    app.manager.add_query(&sql_2).unwrap();
 
-    let transaction = app.manager.generate_transaction();
-    let _res = app.db.query(transaction).await.unwrap();
-    
+    let mut res = app.manager.execute(&app.db).await.unwrap();
+
+    let one: Option<Thing> = res.take((0, "id")).unwrap();
+    dbg!(one);
+
+    let two: Option<Thing> = res.take((1, "id")).unwrap();
+    dbg!(two);
+
+    let three: Option<Thing> = res.take((2, "id")).unwrap();
+    dbg!(three);
+
     let sql = "SELECT * FROM person ORDER BY name ASC";
     let mut res = app.db.query(sql).await.unwrap();
-    
+
     let people: Vec<PersonModel> = res.take(0).unwrap();
 
     let names = vec!["bar", "baz", "foo"];
     for (i, person) in people.iter().enumerate() {
-        assert_eq!(person.name, names[i]);        
+        assert_eq!(person.name, names[i]);
     }
-
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -132,7 +167,12 @@ async fn create_license() {
 
     // create new person: Doc McStuffins
     let sql = "CREATE person:uuid() CONTENT { name: $name }";
-    let mut res = app.db.query(sql).bind(("name", "McStuffins")).await.unwrap();
+    let mut res = app
+        .db
+        .query(sql)
+        .bind(("name", "McStuffins"))
+        .await
+        .unwrap();
 
     let _person_id = res
         .take(0)
@@ -145,7 +185,8 @@ async fn create_license() {
     // create new license
     let sql = "CREATE registry:uuid() CONTENT { registration: $license_number }";
 
-    let _res = app.db
+    let _res = app
+        .db
         .query(sql)
         .bind(("license_number", license_number))
         .await
@@ -158,7 +199,8 @@ async fn create_license() {
             RELATE $bar->licenses->$foo SET id = licenses:uuid();
         ";
 
-    let _res = app.db
+    let _res = app
+        .db
         .query(sql)
         .bind(("name", "McStuffins"))
         .bind(("license_number", license_number))
@@ -171,7 +213,8 @@ async fn create_license() {
     // create another ew license
     let sql = "CREATE registry:uuid() CONTENT { registration: $license_number }";
 
-    let _res = app.db
+    let _res = app
+        .db
         .query(sql)
         .bind(("license_number", &license_number))
         .await
@@ -184,7 +227,8 @@ async fn create_license() {
             RELATE $bar->licenses->$foo SET id = licenses:uuid();
         ";
 
-    let _res = app.db
+    let _res = app
+        .db
         .query(sql)
         .bind(("name", "McStuffins"))
         .bind(("license_number", &license_number))
@@ -198,7 +242,8 @@ async fn create_license() {
             SELECT *, $blah->licenses->person from person;
         ";
 
-    let mut res = app.db
+    let mut res = app
+        .db
         .query(sql)
         .bind(("license_number", license_number))
         .await

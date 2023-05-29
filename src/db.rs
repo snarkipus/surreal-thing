@@ -1,4 +1,4 @@
-use surrealdb::sql::Statement;
+use surrealdb::{sql::Statement, Response};
 
 use color_eyre::{eyre::Context, Result};
 use surrealdb::{
@@ -38,7 +38,6 @@ impl Default for DatabaseSettings {
 #[derive(Clone, Debug)]
 pub struct Database {
     pub client: Surreal<Client>,
-    pub query_manager: QueryManager,
 }
 
 impl Database {
@@ -76,10 +75,7 @@ impl Database {
             .await
             .context("Failed to set namespace & database")?;
 
-        Ok(Self {
-            client,
-            query_manager: QueryManager::new(),
-        })
+        Ok(Self { client })
     }
     // endregion: --- SurrealDB Initialization
 
@@ -121,20 +117,21 @@ impl QueryManager {
         let mut transaction = String::from("BEGIN TRANSACTION;\n");
         for query in &self.queries {
             transaction.push_str(query);
-            transaction.push_str(";\n");
+            transaction.push('\n');
         }
         transaction.push_str("COMMIT TRANSACTION;");
         Transaction(transaction)
     }
 
     #[tracing::instrument(name = "Executing QueryManager", skip(self, db))]
-    pub async fn execute(&mut self, db: &Surreal<Client>) -> Result<()> {
+    pub async fn execute(&mut self, db: &Surreal<Client>) -> Result<Response> {
         let transaction = self.generate_transaction();
-        tracing::debug!(transaction = %transaction.0);
-        match db.query(transaction).await {
-            Ok(_) => {
+        tracing::info!(transaction = %transaction.0);
+        let response = db.query(transaction).await;
+        match response {
+            Ok(response) => {
                 self.queries.clear();
-                Ok(())
+                Ok(response)
             }
             Err(e) => Err(e.into()),
         }
