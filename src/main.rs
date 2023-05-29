@@ -6,21 +6,20 @@ use tokio::sync::Mutex;
 use tower_http::trace::TraceLayer;
 use tracing::info;
 
-pub mod error;
 pub mod api;
-pub mod telemetry;
 pub mod db;
+pub mod error;
+pub mod telemetry;
 
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::{Router, Server};
-use uuid::Uuid;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use uuid::Uuid;
 
-use crate::db::{DatabaseSettings, Database, QueryManager};
-
+use crate::db::{Database, DatabaseSettings, QueryManager};
 
 // region: -- conditional tracing for tests
 static TRACING: Lazy<()> = Lazy::new(|| {
@@ -51,6 +50,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let app = Router::new()
         .merge(api::person_routes())
+        .merge(api::person_query_routes())
         .route("/health_check", get(health_check))
         .layer(
             TraceLayer::new_for_http().make_span_with(|request: &hyper::Request<Body>| {
@@ -69,13 +69,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("Listening on {}", addr);
     Server::bind(&addr).serve(app.into_make_service()).await?;
-    
+
     Ok(())
 }
 
-#[tracing::instrument(
-    name = "health check",
-)]
+#[tracing::instrument(name = "health check")]
 pub async fn health_check() -> impl IntoResponse {
     StatusCode::OK
 }

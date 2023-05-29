@@ -32,15 +32,17 @@ pub async fn create(
     Ok(Json(person))
 }
 
+#[debug_handler]
 #[tracing::instrument(name = "Read", skip(db, id))]
 pub async fn read(
     State(db): State<Surreal<Client>>,
-    id: Path<String>
+    id: Path<String>,
 ) -> Result<Json<Option<Person>>, Error> {
     let person = db.select((PERSON, &*id)).await?;
     Ok(Json(person))
 }
 
+#[debug_handler]
 #[tracing::instrument(name = "Update", skip(db, id, person))]
 pub async fn update(
     State(db): State<Surreal<Client>>,
@@ -51,15 +53,17 @@ pub async fn update(
     Ok(Json(person))
 }
 
+#[debug_handler]
 #[tracing::instrument(name = "Delete", skip(db, id))]
 pub async fn delete(
     State(db): State<Surreal<Client>>,
-    id: Path<String>
+    id: Path<String>,
 ) -> Result<Json<Option<Person>>, Error> {
     let person = db.delete((PERSON, &*id)).await?;
     Ok(Json(person))
 }
 
+#[debug_handler]
 #[tracing::instrument(name = "List", skip(db))]
 pub async fn list(State(db): State<Surreal<Client>>) -> Result<Json<Vec<Person>>, Error> {
     let people = db.select(PERSON).await?;
