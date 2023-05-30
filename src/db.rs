@@ -107,7 +107,7 @@ impl QueryManager {
             query = %query
         )
     )]
-    pub fn add_query(&mut self, query: &str) -> Result<()> {
+    pub async fn add_query(&mut self, query: &str) -> Result<()> {
         let query = sql::parse(query).context("Failed to parse query")?;
         self.queries.push(query.to_string());
         Ok(())

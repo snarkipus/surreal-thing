@@ -60,14 +60,14 @@ pub async fn delete(
     State(db): State<Surreal<Client>>,
     id: Path<String>,
 ) -> Result<Json<Option<Person>>, Error> {
-    let person = db.delete((PERSON, &*id)).await?;
+    let person = delete_person(&db, &id).await?;
     Ok(Json(person))
 }
 
 #[debug_handler]
 #[tracing::instrument(name = "List", skip(db))]
 pub async fn list(State(db): State<Surreal<Client>>) -> Result<Json<Vec<Person>>, Error> {
-    let people = db.select(PERSON).await?;
+    let people = list_people(&db).await?;
     Ok(Json(people))
 }
 
@@ -101,7 +101,11 @@ async fn read_person(db: &Surreal<Client>, id: &str) -> Result<Option<Person>, E
 }
 
 #[tracing::instrument(name = "Query: Update Person", skip(db, id, person))]
-async fn update_person(db: &Surreal<Client>, id: &str, person: Person) -> Result<Option<Person>, Error> {
+async fn update_person(
+    db: &Surreal<Client>,
+    id: &str,
+    person: Person,
+) -> Result<Option<Person>, Error> {
     let sql = format!(
         "UPDATE {} CONTENT {{ name: '{}' }}",
         Thing::from((PERSON, id)),
@@ -110,4 +114,20 @@ async fn update_person(db: &Surreal<Client>, id: &str, person: Person) -> Result
     tracing::info!(sql);
     let person: Option<Person> = db.query(sql).await.unwrap().take(0).unwrap();
     Ok(person)
+}
+
+#[tracing::instrument(name = "Query: Delete Person", skip(db, id))]
+async fn delete_person(db: &Surreal<Client>, id: &str) -> Result<Option<Person>, Error> {
+    let sql = format!("DELETE {}", Thing::from((PERSON, id)));
+    tracing::info!(sql);
+    let person: Option<Person> = db.query(sql).await.unwrap().take(0).unwrap();
+    Ok(person)
+}
+
+#[tracing::instrument(name = "Query: List People", skip(db))]
+async fn list_people(db: &Surreal<Client>) -> Result<Vec<Person>, Error> {
+    let sql = format!("SELECT * FROM {}", PERSON);
+    tracing::info!(sql);
+    let people: Vec<Person> = db.query(sql).await.unwrap().take(0).unwrap();
+    Ok(people)
 }

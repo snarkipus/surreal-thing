@@ -1,3 +1,9 @@
+# Pre-Reqs
+- Docker
+- Rust stuff
+
+# Guide
+- run `./scripts/init_db.sh`
 # Watchers
 Build:
 
