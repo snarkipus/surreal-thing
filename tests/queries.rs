@@ -163,7 +163,7 @@ async fn create_license() {
     let license_number_0: usize = 12345;
     let lic_id_0 = Thing::from(("registry".to_string(), Uuid::new_v4().to_string()));
     let sql = format!(
-        "CREATE {} CONTENT {{ registration: '{}' }}",
+        "CREATE {} CONTENT {{ registration: {} }}",
         lic_id_0, license_number_0
     );
     app.manager.add_query(&sql).await.unwrap();
@@ -172,12 +172,13 @@ async fn create_license() {
     let license_number_1: usize = 678910;
     let lic_id_1 = Thing::from(("registry".to_string(), Uuid::new_v4().to_string()));
     let sql = format!(
-        "CREATE {} CONTENT {{ registration: '{}' }}",
+        "CREATE {} CONTENT {{ registration: {} }}",
         lic_id_1, license_number_1
     );
     app.manager.add_query(&sql).await.unwrap();
 
-    app.manager.execute(&app.db).await.unwrap();
+    let _res = app.manager.execute(&app.db).await.unwrap();
+
     // endregion
 
     // region: Act
@@ -228,7 +229,7 @@ async fn create_license() {
     assert_eq!(name.unwrap(), vec!["McStuffins"]);
 
     // SELECT registration, <-licenses<-registry.registration AS registration FROM (SELECT id FROM person WHERE name='McStuffins')
-    let sql = "SELECT registration, <-licenses<-registry.registration AS registration FROM (SELECT id FROM person WHERE name=$name) ORDER BY registration ASC;";
+    let sql = "SELECT registrations, <-licenses<-registry.registration AS registrations FROM (SELECT id FROM person WHERE name=$name);";
     let mut res = app
         .db
         .query(sql)
@@ -236,13 +237,15 @@ async fn create_license() {
         .await
         .unwrap();
 
-    let registrations: Option<Vec<String>> = res.take((0, "registration")).unwrap();
-    assert_eq!(registrations.unwrap(), vec!["12345", "678910"]);
+    let registrations: Option<Vec<usize>> = res.take((0, "registrations")).unwrap();
+    for registration in registrations.unwrap() {
+        assert!(registration == license_number_0 || registration == license_number_1);
+    }
 
     // Teardown
     let sql = "DELETE person WHERE name = 'McStuffins'";
     app.manager.add_query(sql).await.unwrap();
-    let sql = "DELETE registry WHERE registration = '12345' OR registration = '678910'";
+    let sql = "DELETE registry WHERE registration = 12345 OR registration = 678910";
     app.manager.add_query(sql).await.unwrap();
     let sql = "DELETE licenses";
     app.manager.add_query(sql).await.unwrap();

@@ -123,7 +123,7 @@ impl QueryManager {
         Transaction(transaction)
     }
 
-    #[tracing::instrument(name = "Executing QueryManager", skip(self, db))]
+    // #[tracing::instrument(name = "Executing QueryManager", skip(self, db))]
     pub async fn execute(&mut self, db: &Surreal<Client>) -> Result<Response> {
         let transaction = self.generate_transaction();
         tracing::info!(transaction = %transaction.0);
@@ -137,6 +137,10 @@ impl QueryManager {
         }
     }
 }
+
+// Error implementation for QueryManager
+
+
 
 pub struct Transaction(pub String);
 

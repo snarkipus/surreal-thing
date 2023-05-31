@@ -1,3 +1,4 @@
+use crate::db::QueryManager;
 use crate::error::Error;
 use axum::extract::{Path, State};
 use axum::{Json, Router};
@@ -15,11 +16,50 @@ pub fn person_query_routes() -> Router<Surreal<Client>> {
         .route("/person/qry/:id", axum::routing::put(update))
         .route("/person/qry/:id", axum::routing::delete(delete))
         .route("/person/qry/people", axum::routing::get(list))
+        .route("/person/qry/batch_up", axum::routing::post(batch_up))
+        .route("/person/qry/batch_down", axum::routing::delete(batch_down))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Person {
     name: String,
+}
+
+#[debug_handler]
+#[tracing::instrument(name = "Batch Delete", skip(db))]
+pub async fn batch_down(
+    State(db): State<Surreal<Client>>,
+) -> Result<Json<Option<Vec<Person>>>, Error> {
+    let sql = format!("DELETE {}", PERSON);
+    tracing::info!(sql);
+    let people: Option<Vec<Person>> = db.query(sql).await.unwrap().take(0).unwrap();
+    Ok(Json(people))
+}
+
+#[debug_handler]
+#[tracing::instrument(name = "Batch Create", skip(db, people))]
+pub async fn batch_up(
+    State(db): State<Surreal<Client>>,
+    Json(people): Json<Vec<Person>>,
+) -> Result<Json<Option<Vec<Person>>>, Error> {
+    let people = batch_up_fn(&db, people).await?;
+    Ok(Json(Some(people)))
+}
+
+async fn batch_up_fn(
+    db: &Surreal<Client>,
+    people: Vec<Person>,
+) -> Result<Vec<Person>, Error> {
+    let mut manager = QueryManager::new();
+    for person in people {
+        let sql = format!("CREATE person:uuid() CONTENT {{ name: '{}' }}", person.name);
+        manager.add_query(&sql).await.unwrap();
+    }
+    let _results = manager.execute(db).await.unwrap();
+    let sql = format!("SELECT * FROM {}", PERSON);
+    tracing::info!(sql);
+    let people: Vec<Person> = db.query(sql).await.unwrap().take(0).unwrap();
+    Ok(people)
 }
 
 #[debug_handler]

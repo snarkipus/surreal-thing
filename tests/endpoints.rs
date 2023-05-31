@@ -138,6 +138,11 @@ async fn crud_query_endpoints_work() -> color_eyre::Result<()> {
         .send()?;
     response.sexy_print("PUT", format!("{conn_string}{route}").as_str())?;
 
+    // LIST: GET -> .route("/people", get(person::list))
+    let route = "/person/qry/people";
+    let response = minreq::get(format!("{conn_string}{route}")).send().unwrap();
+    response.sexy_print("GET", format!("{conn_string}{route}").as_str())?;
+
     // DELETE: DELETE -> .route("/person/:id", delete(person::delete))
     let route = "/person/qry/1";
     let response = minreq::delete(format!("{conn_string}{route}"))
@@ -145,12 +150,28 @@ async fn crud_query_endpoints_work() -> color_eyre::Result<()> {
         .unwrap();
     response.sexy_print("DELETE", format!("{conn_string}{route}").as_str())?;
 
-    // LIST: GET -> .route("/people", get(person::list))
-    let route = "/person/qry/people";
-    let response = minreq::get(format!("{conn_string}{route}")).send().unwrap();
-    response.sexy_print("GET", format!("{conn_string}{route}").as_str())?;
+    // BATCH: POST -> .route("/person/qry/batch", post(person::batch))
+    let route = "/person/qry/batch_up";
+    let data: Vec<Person> = vec![
+        Person {
+            name: "Luke".into(),
+        },
+        Person {
+            name: "John".into(),
+        },
+    ];
+    let response = minreq::post(format!("{conn_string}{route}"))
+        .with_json(&data)?
+        .send()?;
+    response.sexy_print("POST", format!("{conn_string}{route}").as_str())?;
 
-    // Assert
+    // DELETE: DELETE -> .route("/person/qry/batch_down", delete(person::delete))
+    let route = "/person/qry/batch_down";
+    let response = minreq::delete(format!("{conn_string}{route}"))
+        .send()
+        .unwrap();
+    response.sexy_print("DELETE", format!("{conn_string}{route}").as_str())?;
+    
 
     Ok(())
 }

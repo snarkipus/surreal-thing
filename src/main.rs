@@ -2,7 +2,6 @@ use axum::body::Body;
 use axum_macros::FromRef;
 use once_cell::sync::Lazy;
 use telemetry::{get_subscriber, init_subscriber};
-use tokio::sync::Mutex;
 use tower_http::trace::TraceLayer;
 use tracing::info;
 
@@ -16,10 +15,9 @@ use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::{Router, Server};
 use std::net::SocketAddr;
-use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::db::{Database, DatabaseSettings, QueryManager};
+use crate::db::{Database, DatabaseSettings};
 
 // region: -- conditional tracing for tests
 static TRACING: Lazy<()> = Lazy::new(|| {
@@ -38,7 +36,6 @@ static TRACING: Lazy<()> = Lazy::new(|| {
 #[derive(Debug, Clone, FromRef)]
 pub struct AppState {
     pub db: Database,
-    pub manager: Arc<Mutex<QueryManager>>,
 }
 
 #[tokio::main]
