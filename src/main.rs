@@ -1,13 +1,16 @@
 use axum::body::Body;
 use axum_macros::FromRef;
 use once_cell::sync::Lazy;
+use surrealdb::Surreal;
+use surrealdb::engine::remote::ws::Client;
 use telemetry::{get_subscriber, init_subscriber};
 use tower_http::trace::TraceLayer;
 use tracing::info;
 
 pub mod api;
-pub mod db;
+// pub mod db2;
 pub mod error;
+pub mod surreal;
 pub mod telemetry;
 
 use axum::http::StatusCode;
@@ -17,7 +20,7 @@ use axum::{Router, Server};
 use std::net::SocketAddr;
 use uuid::Uuid;
 
-use crate::db::{Database, DatabaseSettings};
+use surreal::db::{Database, DatabaseSettings};
 
 // region: -- conditional tracing for tests
 static TRACING: Lazy<()> = Lazy::new(|| {
@@ -35,8 +38,10 @@ static TRACING: Lazy<()> = Lazy::new(|| {
 
 #[derive(Debug, Clone, FromRef)]
 pub struct AppState {
-    pub db: Database,
+    pub db: Surreal<Client>,
 }
+
+
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -60,7 +65,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 )
             }),
         )
-        .with_state(db.get_connection());
+        .with_state(db.client);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
 

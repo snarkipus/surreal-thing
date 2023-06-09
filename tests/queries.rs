@@ -4,7 +4,7 @@ use serial_test::serial;
 use surrealdb::{engine::remote::ws::Client, sql::Thing, Surreal};
 
 use surreal_simple::{
-    db::{Database, DatabaseSettings, QueryManager},
+    surreal::db::{Database, DatabaseSettings, Transaction},
     telemetry::{get_subscriber, init_subscriber},
 };
 use uuid::Uuid;
@@ -24,7 +24,6 @@ static TRACING: Lazy<()> = Lazy::new(|| {
 
 pub struct TestApp {
     pub db: Surreal<Client>,
-    pub manager: QueryManager,
 }
 
 async fn setup() -> TestApp {
@@ -33,8 +32,7 @@ async fn setup() -> TestApp {
     let db = Database::new(&DatabaseSettings::default()).await.unwrap();
 
     TestApp {
-        db: db.get_connection(),
-        manager: QueryManager::new(),
+        db: db.client,
     }
 }
 
@@ -106,8 +104,9 @@ async fn create_people() {
 #[serial]
 async fn create_transaction() {
     // Arrange
-    let mut app = setup().await;
-
+    let app = setup().await;
+    let transaction = Transaction::begin(&app.db).await.unwrap();
+    let conn = transaction.conn;
     let sql_0 = format!(
         "CREATE {} CONTENT {{ name: 'foo' }}",
         Thing::from(("person".into(), Uuid::new_v4().to_string()))
@@ -122,10 +121,10 @@ async fn create_transaction() {
     );
 
     // Act
-    app.manager.add_query(&sql_0).await.unwrap();
-    app.manager.add_query(&sql_1).await.unwrap();
-    app.manager.add_query(&sql_2).await.unwrap();
-    let _ = app.manager.execute(&app.db).await.unwrap();
+    conn.query(&sql_0).await.unwrap();
+    conn.query(&sql_1).await.unwrap();
+    conn.query(&sql_2).await.unwrap();
+    transaction.commit(conn).await;
 
     // Assert
     let sql = "SELECT * FROM person ORDER BY name ASC";
@@ -152,12 +151,14 @@ struct LicenseModel {
 #[serial]
 async fn create_license() {
     // region: Arrange
-    let mut app = setup().await;
+    let app = setup().await;
+    let transaction = Transaction::begin(&app.db).await.unwrap();
+    let conn = transaction.conn;
 
     // Create Doc McStuffins
     let doc_id = Thing::from(("person".to_string(), Uuid::new_v4().to_string()));
     let sql = format!("CREATE {} CONTENT {{ name: '{}' }}", doc_id, "McStuffins");
-    app.manager.add_query(&sql).await.unwrap();
+    conn.query(&sql).await.unwrap();
 
     // Create a license for Doc McStuffins
     let license_number_0: usize = 12345;
@@ -166,7 +167,7 @@ async fn create_license() {
         "CREATE {} CONTENT {{ registration: {} }}",
         lic_id_0, license_number_0
     );
-    app.manager.add_query(&sql).await.unwrap();
+    conn.query(&sql).await.unwrap();
 
     // Create another license for Doc McStuffins
     let license_number_1: usize = 678910;
@@ -175,9 +176,9 @@ async fn create_license() {
         "CREATE {} CONTENT {{ registration: {} }}",
         lic_id_1, license_number_1
     );
-    app.manager.add_query(&sql).await.unwrap();
+    conn.query(&sql).await.unwrap();
 
-    let _res = app.manager.execute(&app.db).await.unwrap();
+    transaction.commit(conn).await;
 
     // endregion
 
@@ -243,12 +244,14 @@ async fn create_license() {
     }
 
     // Teardown
+    let transaction = Transaction::begin(&app.db).await.unwrap();
+    let conn = transaction.conn;
     let sql = "DELETE person WHERE name = 'McStuffins'";
-    app.manager.add_query(sql).await.unwrap();
+    conn.query(sql).await.unwrap();
     let sql = "DELETE registry WHERE registration = 12345 OR registration = 678910";
-    app.manager.add_query(sql).await.unwrap();
+    conn.query(sql).await.unwrap();
     let sql = "DELETE licenses";
-    app.manager.add_query(sql).await.unwrap();
-    app.manager.execute(&app.db).await.unwrap();
+    conn.query(sql).await.unwrap();
+    transaction.commit(conn).await;
     // endregion
 }

@@ -9,6 +9,7 @@ edition = "2021"
 axum = { version = "0.6.18", features = ["macros"] }
 axum-macros = "0.3.7"
 color-eyre = "0.6.2"
+futures-core = "0.3.28"
 hyper = { version = "0.14.26", features = ["full"] }
 once_cell = "1.17.1"
 serde = { version = "1.0.163", features = ["derive"] }

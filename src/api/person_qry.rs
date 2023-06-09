@@ -1,8 +1,10 @@
-use crate::db::QueryManager;
 use crate::error::Error;
+use crate::surreal::db::Transaction;
+// use crate::surreal::db::QueryManager;
 use axum::extract::{Path, State};
 use axum::{Json, Router};
 use axum_macros::debug_handler;
+use color_eyre::eyre::eyre;
 use serde::{Deserialize, Serialize};
 use surrealdb::sql::Thing;
 use surrealdb::{engine::remote::ws::Client, Surreal};
@@ -32,7 +34,7 @@ pub async fn batch_down(
 ) -> Result<Json<Option<Vec<Person>>>, Error> {
     let sql = format!("DELETE {}", PERSON);
     tracing::info!(sql);
-    let people: Option<Vec<Person>> = db.query(sql).await.unwrap().take(0).unwrap();
+    let people: Option<Vec<Person>> = db.query(sql).await.unwrap().take(0)?;
     Ok(Json(people))
 }
 
@@ -46,41 +48,67 @@ pub async fn batch_up(
     Ok(Json(Some(people)))
 }
 
-async fn batch_up_fn(
-    db: &Surreal<Client>,
-    people: Vec<Person>,
-) -> Result<Vec<Person>, Error> {
-    let mut manager = QueryManager::new();
+async fn batch_up_fn(db: &Surreal<Client>, people: Vec<Person>) -> Result<Vec<Person>, Error> {
+    let transaction = Transaction::begin(db).await?;
+    let conn = transaction.conn;
     for person in people {
         let sql = format!("CREATE person:uuid() CONTENT {{ name: '{}' }}", person.name);
-        manager.add_query(&sql).await.unwrap();
+        conn.query(&sql).await?;
     }
-    let _results = manager.execute(db).await.unwrap();
+    transaction.commit(conn).await;
     let sql = format!("SELECT * FROM {}", PERSON);
     tracing::info!(sql);
-    let people: Vec<Person> = db.query(sql).await.unwrap().take(0).unwrap();
+    let people: Vec<Person> = db.query(sql).await.unwrap().take(0)?;
     Ok(people)
 }
 
+// region: CREATE
 #[debug_handler]
-#[tracing::instrument(name = "Create", skip(db, id, person))]
+// #[tracing::instrument(name = "Create", skip(db, id, person))]
 pub async fn create(
     State(db): State<Surreal<Client>>,
     id: Path<String>,
     Json(person): Json<Person>,
-) -> Result<Json<Option<Person>>, Error> {
-    let person = create_person(&db, &id, person).await?;
-    Ok(Json(person))
+) -> Result<Json<Person>, Error> {
+    let person = create_person(&db, &id, person).await.map_err(|e| {
+        tracing::error!("{:?}", e);
+        e
+    });
+
+    match person {
+        Ok(person) => Ok(Json(person)),
+        Err(_) => Err(Error::Db),
+    }
 }
+
+// #[tracing::instrument(name = "Query: Create Person", skip(db, id, person))]
+async fn create_person(
+    db: &Surreal<Client>,
+    id: &str,
+    person: Person,
+) -> color_eyre::Result<Person> {
+    let sql = format!(
+        "CREATE {} CONTENT {{ name: '{}' }}",
+        Thing::from((PERSON, id)),
+        person.name
+    );
+    tracing::info!(sql);
+    let person: Option<Person> = db.query(sql).await?.take(0)?;
+    match person {
+        Some(person) => Ok(person),
+        None => Err(eyre!("Person not created")),
+    }
+}
+// endregion
 
 #[debug_handler]
 #[tracing::instrument(name = "Read", skip(db, id))]
 pub async fn read(
     State(db): State<Surreal<Client>>,
     id: Path<String>,
-) -> Result<Json<Option<Person>>, Error> {
+) -> Result<Json<Person>, Error> {
     let person = read_person(&db, &id).await?;
-    Ok(Json(person))
+    Ok(Json(person.unwrap()))
 }
 
 #[debug_handler]
@@ -89,9 +117,9 @@ pub async fn update(
     State(db): State<Surreal<Client>>,
     id: Path<String>,
     Json(person): Json<Person>,
-) -> Result<Json<Option<Person>>, Error> {
+) -> Result<Json<Person>, Error> {
     let person = update_person(&db, &id, person).await?;
-    Ok(Json(person))
+    Ok(Json(person.unwrap()))
 }
 
 #[debug_handler]
@@ -109,23 +137,6 @@ pub async fn delete(
 pub async fn list(State(db): State<Surreal<Client>>) -> Result<Json<Vec<Person>>, Error> {
     let people = list_people(&db).await?;
     Ok(Json(people))
-}
-
-#[tracing::instrument(name = "Query: Create Person", skip(db, id, person))]
-async fn create_person(
-    db: &Surreal<Client>,
-    id: &str,
-    person: Person,
-) -> Result<Option<Person>, Error> {
-    let sql = format!(
-        "CREATE {} CONTENT {{ name: '{}' }}",
-        Thing::from((PERSON, id)),
-        person.name
-    );
-    tracing::info!(sql);
-    let person: Option<Person> = db.query(sql).await.unwrap().take(0).unwrap();
-
-    Ok(person)
 }
 
 #[tracing::instrument(name = "Query: Read Person", skip(db, id))]

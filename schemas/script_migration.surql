@@ -1,6 +1,4 @@
 DEFINE TABLE person SCHEMAFULL;
 
-DEFINE FIELD id ON person TYPE number ASSERT $value != NONE;
-DEFINE INDEX id ON TABLE person COLUMNS id UNIQUE;
 DEFINE FIELD name ON person TYPE string ASSERT $value != NONE;
 DEFINE INDEX name ON TABLE person COLUMNS name UNIQUE;

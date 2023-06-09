@@ -171,7 +171,6 @@ async fn crud_query_endpoints_work() -> color_eyre::Result<()> {
         .send()
         .unwrap();
     response.sexy_print("DELETE", format!("{conn_string}{route}").as_str())?;
-    
 
     Ok(())
 }
