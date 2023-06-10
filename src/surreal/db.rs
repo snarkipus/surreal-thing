@@ -1,6 +1,7 @@
 use crate::error::Error;
 use color_eyre::{eyre::Context, Result};
 use futures_core::future::BoxFuture;
+
 use surrealdb::{
     engine::remote::ws::{Client, Ws, Wss},
     opt::auth::Root,
@@ -79,6 +80,7 @@ impl Database {
 }
 // endregion: -- Database
 
+// region: -- Transaction
 pub struct Transaction<'c> {
     pub conn: &'c Surreal<Client>,
     pub open: bool,
@@ -95,10 +97,10 @@ impl<'c> Transaction<'c> {
         })
     }
 
-    pub async fn commit(mut self, conn: &Surreal<Client>) -> BoxFuture<'_, Result<(), Error>> {
+    pub async fn commit(mut self) -> BoxFuture<'c, Result<(), Error>> {
         Box::pin(async move {
             let sql = "COMMIT TRANSACTION;";
-            let response = conn.query(sql).await?;
+            let response = self.conn.query(sql).await?;
             response.check()?;
             self.open = false;
 
@@ -106,13 +108,14 @@ impl<'c> Transaction<'c> {
         })
     }
 
-    pub async fn rollback(mut self, conn: &Surreal<Client>) -> BoxFuture<'_, Result<(), Error>> {
+    pub async fn rollback(mut self) -> BoxFuture<'c, Result<(), Error>> {
         Box::pin(async move {
             let sql = "CANCEL TRANSACTION;";
-            let response = conn.query(sql).await?;
+            let response = self.conn.query(sql).await?;
             response.check()?;
             self.open = false;
             Ok(())
         })
     }
 }
+// endregion: -- Transaction

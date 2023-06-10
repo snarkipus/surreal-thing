@@ -124,7 +124,7 @@ async fn create_transaction() {
     conn.query(&sql_0).await.unwrap();
     conn.query(&sql_1).await.unwrap();
     conn.query(&sql_2).await.unwrap();
-    transaction.commit(conn).await;
+    transaction.commit().await;
 
     // Assert
     let sql = "SELECT * FROM person ORDER BY name ASC";
@@ -178,7 +178,7 @@ async fn create_license() {
     );
     conn.query(&sql).await.unwrap();
 
-    transaction.commit(conn).await;
+    transaction.commit().await;
 
     // endregion
 
@@ -252,6 +252,6 @@ async fn create_license() {
     conn.query(sql).await.unwrap();
     let sql = "DELETE licenses";
     conn.query(sql).await.unwrap();
-    transaction.commit(conn).await;
+    transaction.commit().await;
     // endregion
 }

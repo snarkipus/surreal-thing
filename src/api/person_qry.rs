@@ -55,7 +55,7 @@ async fn batch_up_fn(db: &Surreal<Client>, people: Vec<Person>) -> Result<Vec<Pe
         let sql = format!("CREATE person:uuid() CONTENT {{ name: '{}' }}", person.name);
         conn.query(&sql).await?;
     }
-    transaction.commit(conn).await;
+    transaction.commit().await;
     let sql = format!("SELECT * FROM {}", PERSON);
     tracing::info!(sql);
     let people: Vec<Person> = db.query(sql).await.unwrap().take(0)?;
